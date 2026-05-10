@@ -42,7 +42,7 @@ public abstract class InGameHudMixin {
                 return;
             }
 
-            if (Configs.GUI.STOP_PLAY_SHOW_UI.getBooleanValue() && !player.isPlaying()){
+            if (Configs.GUI.STOP_PLAY_SHOW_UI.getBooleanValue() && !player.isPlaying() && !player.isPaused()){
                 return;
             }
 
@@ -103,7 +103,7 @@ public abstract class InGameHudMixin {
             return;
         }
 
-        if (Configs.GUI.STOP_PLAY_SHOW_UI.getBooleanValue() && !player.isPlaying()){
+        if (Configs.GUI.STOP_PLAY_SHOW_UI.getBooleanValue() && !player.isPlaying() && !player.isPaused()){
             return;
         }
 

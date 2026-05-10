@@ -41,6 +41,7 @@ public class MusicPlayer implements Runnable {
     protected boolean loopPlayIn = true;
     protected boolean notExitFlag = true;
     private boolean load;
+    private boolean paused;
     private int volumePercentage;
     private volatile long playingProgress;
     private long startPlayingTime;
@@ -62,6 +63,10 @@ public class MusicPlayer implements Runnable {
 
     public boolean isPlaying() {
         return this.loopPlayIn && this.load && this.getPlayingMusic() != null;
+    }
+
+    public boolean isPaused() {
+        return this.paused;
     }
 
     @Override
@@ -201,6 +206,7 @@ public class MusicPlayer implements Runnable {
         this.volumeSet(volumePercentage);
 
         this.load = true;
+        this.paused = false;
         this.startPlayingTime = System.currentTimeMillis();
         this.audioClip.play();
 
@@ -209,7 +215,7 @@ public class MusicPlayer implements Runnable {
         }
 
         try {
-            while (this.load && this.audioClip != null && !this.audioClip.isClosed()) {
+            while (this.audioClip != null && !this.audioClip.isClosed()) {
                 synchronized (this) {
                 if (!this.load) {
                     this.playingProgress = System.currentTimeMillis() - this.startPlayingTime;
@@ -391,6 +397,7 @@ public class MusicPlayer implements Runnable {
      * 退出播放
      */
     public void exit() {
+        this.paused = false;
         if (this.lyric != null) {
             this.lyric.continues();
             this.lyric.exit();
@@ -409,6 +416,14 @@ public class MusicPlayer implements Runnable {
             this.lyric.stop();
         }
 
+        this.paused = true;
+        if (this.audioClip != null) {
+            try {
+                this.audioClip.pause();
+            } catch (Exception ignored) {
+            }
+        }
+
         synchronized (this) {
             this.load = false;
             notifyAll();
@@ -423,11 +438,19 @@ public class MusicPlayer implements Runnable {
         if (this.lyric != null) {
             this.lyric.continues();
         }
+        this.paused = false;
         this.startPlayingTime = System.currentTimeMillis() - this.playingProgress;
 
         synchronized (this) {
             this.load = true;
             notifyAll();
+        }
+
+        if (this.audioClip != null) {
+            try {
+                this.audioClip.play();
+            } catch (Exception ignored) {
+            }
         }
         this.loopPlayIn = true;
     }
