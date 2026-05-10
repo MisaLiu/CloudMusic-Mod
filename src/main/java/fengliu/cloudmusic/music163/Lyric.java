@@ -1,8 +1,6 @@
 package fengliu.cloudmusic.music163;
 
 import com.google.gson.JsonObject;
-import fengliu.cloudmusic.command.MusicCommand;
-import fengliu.cloudmusic.util.MusicPlayer;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -10,11 +8,10 @@ import java.util.Map;
 /**
  * 滚动歌词
  */
-public class Lyric implements Runnable{
-    private final Map<Long, String> lyric;
-    private final Map<Long, String> tlyric;
-    private boolean loopIn = true;
-    private boolean load = true;
+public class Lyric {
+    private final long[] times;
+    private final String[] texts;
+    private final String[] trans;
     private volatile String[] toLyric = {};
 
     /**
@@ -59,75 +56,50 @@ public class Lyric implements Runnable{
 
     public Lyric(JsonObject data){
         String lyric = data.getAsJsonObject("lrc").get("lyric").getAsString();
-        if(lyric.equals("")){
-            this.lyric = new LinkedHashMap<>();
-            this.tlyric = this.lyric;
+        if (lyric.equals("")) {
+            this.times = new long[0];
+            this.texts = new String[0];
+            this.trans = new String[0];
             return;
         }
 
-        this.lyric = lyricToMap(lyric);
-        if(!data.has("tlyric")){
-            this.tlyric = new LinkedHashMap<>();
-            return;
+        Map<Long, String> lyricMap = lyricToMap(lyric);
+        Map<Long, String> tlyricMap;
+        if (data.has("tlyric")) {
+            String tlyric = data.getAsJsonObject("tlyric").get("lyric").getAsString();
+            tlyricMap = tlyric.isEmpty() ? new LinkedHashMap<>() : lyricToMap(tlyric);
+        } else {
+            tlyricMap = new LinkedHashMap<>();
         }
 
-        String tlyric = data.getAsJsonObject("tlyric").get("lyric").getAsString();
-        if(tlyric.equals("")){
-            this.tlyric = new LinkedHashMap<>();
-            return;
-        }
-
-        this.tlyric = lyricToMap(data.getAsJsonObject("tlyric").get("lyric").getAsString());
-    }
-
-    @Override
-    public void run() {
-        if (this.lyric.isEmpty()) {
-            return;
-        }
-
-        MusicPlayer player = MusicCommand.getPlayer();
-        long[] times = new long[this.lyric.size()];
-        String[] texts = new String[this.lyric.size()];
-        String[] trans = new String[this.lyric.size()];
+        this.times = new long[lyricMap.size()];
+        this.texts = new String[lyricMap.size()];
+        this.trans = new String[lyricMap.size()];
         int i = 0;
-        for (Map.Entry<Long, String> entry : this.lyric.entrySet()) {
+        for (Map.Entry<Long, String> entry : lyricMap.entrySet()) {
             times[i] = entry.getKey();
             texts[i] = entry.getValue();
-            trans[i] = this.tlyric.get(entry.getKey());
+            trans[i] = tlyricMap.get(entry.getKey());
             i++;
         }
+    }
 
-        while (this.loopIn) {
-            synchronized (this) {
-                while (!this.load) {
-                    try {
-                        wait();
-                    } catch (InterruptedException e) {
-                        return;
-                    }
-                }
-            }
+    /**
+     * 根据播放进度更新当前歌词行
+     * @param playingProgress 播放进度 (毫秒)
+     */
+    public void update(long playingProgress) {
+        int index = -1;
+        for (int i = 0; i < times.length && times[i] <= playingProgress; i++) {
+            index = i;
+        }
 
-            long time = player.getPlayingProgress();
-            int index = -1;
-            for (int j = 0; j < times.length && times[j] <= time; j++) {
-                index = j;
-            }
-
-            if (index >= 0) {
-                String t = trans[index];
-                if (t != null) {
-                    this.toLyric = new String[]{texts[index], t};
-                } else {
-                    this.toLyric = new String[]{texts[index]};
-                }
-            }
-
-            try {
-                Thread.sleep(200);
-            } catch (InterruptedException e) {
-                return;
+        if (index >= 0) {
+            String t = trans[index];
+            if (t != null) {
+                this.toLyric = new String[]{texts[index], t};
+            } else {
+                this.toLyric = new String[]{texts[index]};
             }
         }
     }
@@ -138,46 +110,5 @@ public class Lyric implements Runnable{
      */
     public String[] getToLyric() {
         return toLyric;
-    }
-
-    /**
-     * 开始歌词滚动
-     */
-    public void start(){
-        Thread thread = new Thread(this);
-        thread.setDaemon(true);
-        thread.setName("CloudMusicLyric thread");
-        thread.start();
-    }
-
-    /**
-     * 退出歌词滚动
-     */
-    public void exit(){
-        this.loopIn = false;
-        synchronized(this){
-            this.load = true;
-            notifyAll();
-        }
-    }
-
-    /**
-     * 暂停歌词滚动
-     */
-    public void stop(){
-        synchronized(this){
-            this.load = false;
-            notifyAll();
-        }
-    }
-
-    /**
-     * 继续歌词滚动
-     */
-    public void continues(){
-        synchronized(this){
-            this.load = true;
-            notifyAll();
-        }
     }
 }

@@ -208,10 +208,6 @@ public class MusicPlayer implements Runnable {
         this.startPlayingTime = System.currentTimeMillis();
         this.audioClip.play();
 
-        if (lyric != null) {
-            this.lyric.start();
-        }
-
         try {
             while (this.audioClip != null && !this.audioClip.isClosed()) {
                 synchronized (this) {
@@ -228,9 +224,12 @@ public class MusicPlayer implements Runnable {
                     break;
                 }
 
-                if (this.audioClip.isPlaying()) {
-                    this.playingProgress = System.currentTimeMillis() - this.startPlayingTime;
+            if (this.audioClip.isPlaying()) {
+                this.playingProgress = System.currentTimeMillis() - this.startPlayingTime;
+                if (lyric != null) {
+                    lyric.update(this.playingProgress);
                 }
+            }
 
                 if (!this.audioClip.isPlaying() && !this.audioClip.isPaused()) {
                     break;
@@ -242,9 +241,7 @@ public class MusicPlayer implements Runnable {
         }
 
         this.playingProgress = 0;
-        if (lyric != null) {
-            this.lyric.exit();
-        }
+        this.lyric = null;
         if (this.audioClip != null) {
             this.audioClip.close();
             this.audioClip = null;
@@ -392,11 +389,6 @@ public class MusicPlayer implements Runnable {
      */
     public void exit() {
         this.paused = false;
-        if (this.lyric != null) {
-            this.lyric.continues();
-            this.lyric.exit();
-        }
-
         this.loopPlayIn = false;
         this.notExitFlag = false;
         next();
@@ -406,10 +398,6 @@ public class MusicPlayer implements Runnable {
      * 停止播放
      */
     public void stop() {
-        if (this.lyric != null) {
-            this.lyric.stop();
-        }
-
         this.paused = true;
         if (this.audioClip != null) {
             try {
@@ -444,9 +432,6 @@ public class MusicPlayer implements Runnable {
             }
         }
 
-        if (this.lyric != null) {
-            this.lyric.continues();
-        }
         this.loopPlayIn = true;
     }
 
