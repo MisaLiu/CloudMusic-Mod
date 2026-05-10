@@ -15,7 +15,7 @@ public class Lyric implements Runnable{
     private final Map<Long, String> tlyric;
     private boolean loopIn = true;
     private boolean load = true;
-    private String[] toLyric = {};
+    private volatile String[] toLyric = {};
 
     /**
      * 将歌词时间字符串转换为毫秒
@@ -82,53 +82,54 @@ public class Lyric implements Runnable{
 
     @Override
     public void run() {
-        if(this.lyric.isEmpty()){
-            this.toLyric.clone();
+        if (this.lyric.isEmpty()) {
             return;
         }
 
         MusicPlayer player = MusicCommand.getPlayer();
-        this.lyric.forEach((lyricTime, lyricData) -> {
-            if (!this.loopIn) {
-                return;
-            }
+        long[] times = new long[this.lyric.size()];
+        String[] texts = new String[this.lyric.size()];
+        String[] trans = new String[this.lyric.size()];
+        int i = 0;
+        for (Map.Entry<Long, String> entry : this.lyric.entrySet()) {
+            times[i] = entry.getKey();
+            texts[i] = entry.getValue();
+            trans[i] = this.tlyric.get(entry.getKey());
+            i++;
+        }
 
-            String lyric = null, tlyric = null;
-            while (this.loopIn) {
-                synchronized(this){
-                    while(!load) {
-                        try {
-                            wait();
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
+        while (this.loopIn) {
+            synchronized (this) {
+                while (!this.load) {
+                    try {
+                        wait();
+                    } catch (InterruptedException e) {
+                        return;
                     }
                 }
+            }
 
-                long time = player.getPlayingProgress();
-                if (time >= lyricTime){
-                    lyric = lyricData;
-                    tlyric = this.tlyric.get(lyricTime);
-                    break;
+            long time = player.getPlayingProgress();
+            int index = -1;
+            for (int j = 0; j < times.length && times[j] <= time; j++) {
+                index = j;
+            }
+
+            if (index >= 0) {
+                String t = trans[index];
+                if (t != null) {
+                    this.toLyric = new String[]{texts[index], t};
+                } else {
+                    this.toLyric = new String[]{texts[index]};
                 }
-
-                try {
-                    Thread.sleep(10);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
             }
 
-            if (lyric != null && tlyric == null){
-                this.toLyric = new String[]{lyric};
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                return;
             }
-
-            if(lyric != null && tlyric != null){
-                this.toLyric = new String[]{lyric, tlyric};
-            }
-
-        });
-        this.toLyric.clone();
+        }
     }
 
     /**

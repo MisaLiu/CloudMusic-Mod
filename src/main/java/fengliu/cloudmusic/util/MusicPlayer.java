@@ -219,14 +219,10 @@ public class MusicPlayer implements Runnable {
                 synchronized (this) {
                 if (!this.load) {
                     this.playingProgress = System.currentTimeMillis() - this.startPlayingTime;
-                    this.audioClip.pause();
                     while (!this.load) {
                         wait();
                     }
                     this.startPlayingTime = System.currentTimeMillis() - this.playingProgress;
-                    if (this.audioClip != null && !this.audioClip.isClosed()) {
-                        this.audioClip.play();
-                    }
                 }
                 }
 
@@ -435,9 +431,6 @@ public class MusicPlayer implements Runnable {
      * 继续播放
      */
     public void continues() {
-        if (this.lyric != null) {
-            this.lyric.continues();
-        }
         this.paused = false;
         this.startPlayingTime = System.currentTimeMillis() - this.playingProgress;
 
@@ -451,6 +444,10 @@ public class MusicPlayer implements Runnable {
                 this.audioClip.play();
             } catch (Exception ignored) {
             }
+        }
+
+        if (this.lyric != null) {
+            this.lyric.continues();
         }
         this.loopPlayIn = true;
     }
