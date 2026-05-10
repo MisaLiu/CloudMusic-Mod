@@ -13,6 +13,7 @@ repositories {
     maven { url 'https://maven.wispforest.io' }
     maven { url 'https://jitpack.io' }
     maven { url 'https://maven.terraformersmc.com/releases/' }
+    maven { url 'https://api.modrinth.com/maven' }
 }
 
 dependencies {
@@ -33,11 +34,14 @@ dependencies {
     implementation("org.jflac:jflac-codec:1.5.2")
     // ZXing Core，用于二维码处理
     implementation("com.google.zxing:core:3.5.1")
+    // Melody
+    modImplementation("maven.modrinth:melody:1.0.10-1.21-fabric")
     include("javazoom:jlayer:1.0.1")
     include("com.googlecode.soundlibs:mp3spi:1.9.5.4")
     include("com.googlecode.soundlibs:tritonus-share:0.3.7.4")
     include("org.jflac:jflac-codec:1.5.2")
     include("com.google.zxing:core:3.5.1")
+    include("maven.modrinth:melody:1.0.10-1.21-fabric")
 }
 
 processResources {

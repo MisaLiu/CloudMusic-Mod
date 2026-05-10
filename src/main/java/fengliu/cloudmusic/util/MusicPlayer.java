@@ -12,12 +12,20 @@ import fengliu.cloudmusic.util.page.Page;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.Text;
 
-import javax.sound.sampled.*;
+import de.keksuccino.melody.resources.audio.openal.ALAudioBuffer;
+import de.keksuccino.melody.resources.audio.openal.ALAudioClip;
+import javax.sound.sampled.AudioFormat;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 /**
  * 歌曲播放对象
@@ -26,7 +34,7 @@ public class MusicPlayer implements Runnable {
     private final MinecraftClient client = MinecraftClient.getInstance();
     protected final List<IMusic> playList;
     private IMusic playingMusic = null;
-    private SourceDataLine play;
+    private ALAudioClip audioClip;
     private Lyric lyric;
     protected int playIn = 0;
     protected int playListSize;
@@ -159,43 +167,85 @@ public class MusicPlayer implements Runnable {
     /**
      * 播放歌曲
      */
-    private void play(AudioInputStream audioInputStream) throws IOException, InterruptedException, LineUnavailableException {
+    private void play(AudioInputStream audioInputStream) throws Exception {
         AudioFormat audioFormat = audioInputStream.getFormat();
-        // 转换文件编码
         if (audioFormat.getEncoding() != AudioFormat.Encoding.PCM_SIGNED) {
-            System.out.println(audioFormat.getEncoding());
             audioFormat = new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, audioFormat.getSampleRate(), 16, audioFormat.getChannels(), audioFormat.getChannels() * 2, audioFormat.getSampleRate(), false);
             audioInputStream = AudioSystem.getAudioInputStream(audioFormat, audioInputStream);
         }
 
-        DataLine.Info dataLineInfo = new DataLine.Info(SourceDataLine.class, audioFormat, AudioSystem.NOT_SPECIFIED);
-        play = (SourceDataLine) AudioSystem.getLine(dataLineInfo);
-        play.open(audioFormat);
-        //设置音量
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        byte[] buf = new byte[4096];
+        int read;
+        while ((read = audioInputStream.read(buf, 0, buf.length)) != -1) {
+            baos.write(buf, 0, read);
+        }
+        byte[] pcmData = baos.toByteArray();
+
+        ByteBuffer byteBuffer = ByteBuffer.allocateDirect(pcmData.length);
+        byteBuffer.put(pcmData);
+        byteBuffer.flip();
+        ALAudioBuffer audioBuffer = new ALAudioBuffer(byteBuffer, audioFormat);
+
+        CompletableFuture<ALAudioClip> future = new CompletableFuture<>();
+        client.execute(() -> {
+            try {
+                future.complete(ALAudioClip.create());
+            } catch (Exception ex) {
+                future.completeExceptionally(ex);
+            }
+        });
+        this.audioClip = future.get();
+
+        this.audioClip.setStaticBuffer(audioBuffer);
         this.volumeSet(volumePercentage);
 
-        play.start();
         if (lyric != null) {
             this.lyric.start();
         }
 
-        int count;
-        byte[] tempBuff = new byte[1024];
-
         this.load = true;
         this.startPlayingTime = System.currentTimeMillis();
-        while ((count = audioInputStream.read(tempBuff, 0, tempBuff.length)) != -1) {
-            synchronized (this) {
-                while (!load)
-                    wait();
+        this.audioClip.play();
+
+        try {
+            while (this.load && this.audioClip != null && !this.audioClip.isClosed()) {
+                synchronized (this) {
+                    if (!this.load) {
+                        this.audioClip.pause();
+                        while (!this.load) {
+                            wait();
+                        }
+                        if (this.audioClip != null && !this.audioClip.isClosed()) {
+                            this.audioClip.play();
+                        }
+                    }
+                }
+
+                if (this.audioClip == null || this.audioClip.isClosed()) {
+                    break;
+                }
+
+                if (this.audioClip.isPlaying()) {
+                    this.playingProgress = System.currentTimeMillis() - this.startPlayingTime;
+                }
+
+                if (!this.audioClip.isPlaying() && !this.audioClip.isPaused()) {
+                    break;
+                }
+
+                Thread.sleep(200);
             }
-            play.write(tempBuff, 0, count);
-            this.playingProgress = System.currentTimeMillis() - this.startPlayingTime;
+        } catch (Exception ignored) {
         }
 
         this.playingProgress = 0;
         if (lyric != null) {
             this.lyric.exit();
+        }
+        if (this.audioClip != null) {
+            this.audioClip.close();
+            this.audioClip = null;
         }
     }
 
@@ -240,12 +290,14 @@ public class MusicPlayer implements Runnable {
         }
 
         this.volumePercentage = volume;
-        if (this.play == null) {
+        if (this.audioClip == null) {
             return;
         }
 
-        FloatControl gainControl = (FloatControl) this.play.getControl(FloatControl.Type.MASTER_GAIN);
-        gainControl.setValue(gainControl.getMinimum() * (1 - volume / 100.0f));
+        try {
+            this.audioClip.setVolume(volume / 100.0f);
+        } catch (Exception ignored) {
+        }
 
         Configs.PLAY.VOLUME.setIntegerValue(this.volumePercentage);
         Configs.INSTANCE.save();
@@ -287,8 +339,18 @@ public class MusicPlayer implements Runnable {
             return;
         }
 
-        this.play.stop();
-        this.play.close();
+        synchronized (this) {
+            this.load = true;
+            notifyAll();
+        }
+
+        if (this.audioClip != null) {
+            try {
+                this.audioClip.stop();
+            } catch (Exception ignored) {
+            }
+            this.audioClip.close();
+        }
     }
 
     /**
