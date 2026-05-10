@@ -42,7 +42,7 @@ public class MusicPlayer implements Runnable {
     protected boolean notExitFlag = true;
     private boolean load;
     private int volumePercentage;
-    private long playingProgress;
+    private volatile long playingProgress;
     private long startPlayingTime;
 
     /**
@@ -200,26 +200,28 @@ public class MusicPlayer implements Runnable {
         this.audioClip.setStaticBuffer(audioBuffer);
         this.volumeSet(volumePercentage);
 
-        if (lyric != null) {
-            this.lyric.start();
-        }
-
         this.load = true;
         this.startPlayingTime = System.currentTimeMillis();
         this.audioClip.play();
 
+        if (lyric != null) {
+            this.lyric.start();
+        }
+
         try {
             while (this.load && this.audioClip != null && !this.audioClip.isClosed()) {
                 synchronized (this) {
-                    if (!this.load) {
-                        this.audioClip.pause();
-                        while (!this.load) {
-                            wait();
-                        }
-                        if (this.audioClip != null && !this.audioClip.isClosed()) {
-                            this.audioClip.play();
-                        }
+                if (!this.load) {
+                    this.playingProgress = System.currentTimeMillis() - this.startPlayingTime;
+                    this.audioClip.pause();
+                    while (!this.load) {
+                        wait();
                     }
+                    this.startPlayingTime = System.currentTimeMillis() - this.playingProgress;
+                    if (this.audioClip != null && !this.audioClip.isClosed()) {
+                        this.audioClip.play();
+                    }
+                }
                 }
 
                 if (this.audioClip == null || this.audioClip.isClosed()) {

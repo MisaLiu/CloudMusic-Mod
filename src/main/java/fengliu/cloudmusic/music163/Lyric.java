@@ -111,6 +111,12 @@ public class Lyric implements Runnable{
                     tlyric = this.tlyric.get(lyricTime);
                     break;
                 }
+
+                try {
+                    Thread.sleep(10);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
             }
 
             if (lyric != null && tlyric == null){
