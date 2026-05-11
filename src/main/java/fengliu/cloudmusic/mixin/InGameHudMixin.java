@@ -3,6 +3,7 @@ package fengliu.cloudmusic.mixin;
 import com.google.gson.JsonElement;
 import com.mojang.blaze3d.systems.RenderSystem;
 import fengliu.cloudmusic.command.MusicCommand;
+import fengliu.cloudmusic.config.Anchor;
 import fengliu.cloudmusic.config.Configs;
 import fengliu.cloudmusic.music163.IMusic;
 import fengliu.cloudmusic.music163.data.DjMusic;
@@ -47,15 +48,36 @@ public abstract class InGameHudMixin {
             }
 
             float lyricScale = (float) Configs.GUI.LYRIC_SCALE.getDoubleValue();
-            int lyricY = Configs.GUI.LYRIC_Y.getIntegerValue();
-            int lyricX = Configs.GUI.LYRIC_X.getIntegerValue();
+            int offsetY = Configs.GUI.LYRIC_Y.getIntegerValue();
+            int offsetX = Configs.GUI.LYRIC_X.getIntegerValue();
             int lyricColor = Configs.GUI.LYRIC_COLOR.getIntegerValue();
-            for (String lyric : MusicCommand.getPlayer().getLyric()) {
-                MatrixStack lyricMatrices = new MatrixStack();
-                lyricMatrices.scale(lyricScale, lyricScale, lyricScale);
-                drawContext.drawText(client.textRenderer, lyric, lyricX, lyricY, lyricColor, true);
-                lyricY += 10;
+            String[] lines = MusicCommand.getPlayer().getLyric();
+
+            float lyricWidth = 0;
+            for (String line : lines) {
+                float w = client.textRenderer.getWidth(line);
+                if (w > lyricWidth) lyricWidth = w;
             }
+            float lyricHeight = lines.length * 10f;
+            int screenW = client.getWindow().getScaledWidth();
+            int screenH = client.getWindow().getScaledHeight();
+            Anchor anchor = (Anchor) Configs.GUI.LYRIC_ANCHOR.getOptionListValue();
+            float px = Anchor.positionX(anchor, screenW, lyricWidth, offsetX);
+            float py = Anchor.positionY(anchor, screenH, lyricHeight, offsetY);
+            float ax = Anchor.anchorX(anchor, lyricWidth, px);
+            float ay = Anchor.anchorY(anchor, lyricHeight, py);
+
+            MatrixStack matrices = drawContext.getMatrices();
+            matrices.push();
+            matrices.translate(ax, ay, 0);
+            matrices.scale(lyricScale, lyricScale, 1.0f);
+            matrices.translate(-ax, -ay, 0);
+            float ly = py;
+            for (String lyric : lines) {
+                drawContext.drawText(client.textRenderer, lyric, (int) px, (int) ly, lyricColor, true);
+                ly += 10;
+            }
+            matrices.pop();
         });
     }
 
@@ -112,39 +134,54 @@ public abstract class InGameHudMixin {
             return;
         }
 
-        int width = this.client.getWindow().getScaledWidth();
+        int screenW = this.client.getWindow().getScaledWidth();
+        int screenH = this.client.getWindow().getScaledHeight();
 
         int[] pos = this.getMusicInfoPos();
         int y = pos[0];
         int x = pos[1];
 
-        context.fill(width - 175 - x, y, width - x, 48 + y, Configs.GUI.MUSIC_INFO_COLOR.getIntegerValue());
-        context.fill(width - 145 - x, 40 + y, width - 30 - x, 43 + y, Configs.GUI.MUSIC_PROGRESS_BAR_COLOR.getIntegerValue());
+        float infoScale = (float) Configs.GUI.MUSIC_INFO_SCALE.getDoubleValue();
+        Anchor infoAnchor = (Anchor) Configs.GUI.MUSIC_INFO_ANCHOR.getOptionListValue();
+        int panelLeft = (int) Anchor.positionX(infoAnchor, screenW, 175, x);
+        int panelTop = (int) Anchor.positionY(infoAnchor, screenH, 48, y);
+        float ax = Anchor.anchorX(infoAnchor, 175f, panelLeft);
+        float ay = Anchor.anchorY(infoAnchor, 48f, panelTop);
+
+        MatrixStack matrices = context.getMatrices();
+        matrices.push();
+        matrices.translate(ax, ay, 0);
+        matrices.scale(infoScale, infoScale, 1.0f);
+        matrices.translate(-ax, -ay, 0);
+
+        context.fill(panelLeft, panelTop, panelLeft + 175, panelTop + 48, Configs.GUI.MUSIC_INFO_COLOR.getIntegerValue());
+        context.fill(panelLeft + 30, panelTop + 40, panelLeft + 145, panelTop + 43, Configs.GUI.MUSIC_PROGRESS_BAR_COLOR.getIntegerValue());
         int progress = Math.round((115 / (float) playingMusic.getDurationSecond()) * player.getPlayingProgressSecond());
         if (progress > 115) {
             progress = 115;
         }
         Function<Identifier, RenderLayer> renderLayer = RenderLayer::getGuiTexturedOverlay;
-        context.fill(width - 145 - x, 40 + y, width - 145 + progress - x, 43 + y, Configs.GUI.MUSIC_PLAYED_PROGRESS_BAR_COLOR.getIntegerValue());
-        context.drawTexture(renderLayer, MusicIconTexture.MUSIC_ICON_ID, width - 172 - x, (int) (2.5f + y), 32f, 32f, 32, 32, 32, 32);
-        context.drawText(this.client.textRenderer, playingMusic.getName().length() > 16 ? playingMusic.getName().substring(0, 16) + "..." : playingMusic.getName(), width - 135 - x, 4 + y, Configs.GUI.MUSIC_INFO_TITLE_FONT_COLOR.getIntegerValue(), true);
+        context.fill(panelLeft + 30, panelTop + 40, panelLeft + 30 + progress, panelTop + 43, Configs.GUI.MUSIC_PLAYED_PROGRESS_BAR_COLOR.getIntegerValue());
+        context.drawTexture(renderLayer, MusicIconTexture.MUSIC_ICON_ID, panelLeft + 3, panelTop + 2, 32f, 32f, 32, 32, 32, 32);
+        context.drawText(this.client.textRenderer, playingMusic.getName().length() > 16 ? playingMusic.getName().substring(0, 16) + "..." : playingMusic.getName(), panelLeft + 40, panelTop + 4, Configs.GUI.MUSIC_INFO_TITLE_FONT_COLOR.getIntegerValue(), true);
 
         int progressFontColor = Configs.GUI.MUSIC_PROGRESS_FONT_COLOR.getIntegerValue();
-        context.drawText(this.client.textRenderer, player.getPlayingProgressToString(), width - 172 - x, 38 + y, progressFontColor, true);
-        context.drawText(this.client.textRenderer, playingMusic.getDurationToString(), width - 28 - x, 38 + y, progressFontColor, true);
+        context.drawText(this.client.textRenderer, player.getPlayingProgressToString(), panelLeft + 3, panelTop + 38, progressFontColor, true);
+        context.drawText(this.client.textRenderer, playingMusic.getDurationToString(), panelLeft + 147, panelTop + 38, progressFontColor, true);
         int musicFontColor = Configs.GUI.MUSIC_INFO_FONT_COLOR.getIntegerValue();
         if (playingMusic instanceof DjMusic music) {
-            context.drawText(this.client.textRenderer, Text.translatable("cloudmusic.info.dj.creator", music.dj.get("nickname").getAsString()), width - 135 - x, 14 + y, musicFontColor, true);
-            context.drawText(this.client.textRenderer, Text.translatable("cloudmusic.info.dj.music.count", music.listenerCount, music.likedCount), width - 135 - x, 24 + y, musicFontColor, true);
+            context.drawText(this.client.textRenderer, Text.translatable("cloudmusic.info.dj.creator", music.dj.get("nickname").getAsString()), panelLeft + 40, panelTop + 14, musicFontColor, true);
+            context.drawText(this.client.textRenderer, Text.translatable("cloudmusic.info.dj.music.count", music.listenerCount, music.likedCount), panelLeft + 40, panelTop + 24, musicFontColor, true);
+            matrices.pop();
             return;
         }
 
         Music music = (Music) playingMusic;
         if (!music.aliasName.isEmpty()) {
-            context.drawText(this.client.textRenderer, music.aliasName.length() > 16 ? music.aliasName.substring(0, 16) + "..." : music.aliasName, width - 135 - x, 14 + y, musicFontColor, true);
+            context.drawText(this.client.textRenderer, music.aliasName.length() > 16 ? music.aliasName.substring(0, 16) + "..." : music.aliasName, panelLeft + 40, panelTop + 14, musicFontColor, true);
         } else {
             String album = music.album.get("name").getAsString();
-            context.drawText(this.client.textRenderer, album.length() > 16 ? album.substring(0, 16) + "..." : album, width - 135 - x, 14 + y, musicFontColor, true);
+            context.drawText(this.client.textRenderer, album.length() > 16 ? album.substring(0, 16) + "..." : album, panelLeft + 40, panelTop + 14, musicFontColor, true);
         }
 
         StringBuilder artist = new StringBuilder();
@@ -152,14 +189,14 @@ public abstract class InGameHudMixin {
             artist.append(artistData.getAsJsonObject().get("name").getAsString()).append("/");
         }
         artist = new StringBuilder(artist.substring(0, artist.length() - 1));
-        context.drawText(this.client.textRenderer, artist.length() > 16 ? artist.substring(0, 16) + "..." : artist.toString(), width - 135 - x, 24 + y, musicFontColor, true);
+        context.drawText(this.client.textRenderer, artist.length() > 16 ? artist.substring(0, 16) + "..." : artist.toString(), panelLeft + 40, panelTop + 24, musicFontColor, true);
 
-        if (music.freeTrialInfo == null) {
-            return;
+        if (music.freeTrialInfo != null) {
+            int freeTrialEndProgress = Math.round((115 / (float) playingMusic.getDurationSecond()) * music.freeTrialInfo.get("end").getAsInt());
+            context.fill(panelLeft + 30 + freeTrialEndProgress - 1, panelTop + 40, panelLeft + 30 + freeTrialEndProgress + 1, panelTop + 43, Configs.GUI.MUSIC_PLAYED_PROGRESS_BAR_COLOR.getIntegerValue());
         }
 
-        int freeTrialEndProgress = Math.round((115 / (float) playingMusic.getDurationSecond()) * music.freeTrialInfo.get("end").getAsInt());
-        context.fill(width - 145 + freeTrialEndProgress - 1 - x, 40 + y, width - 145 + freeTrialEndProgress + 1 - x, 43 + y, Configs.GUI.MUSIC_PLAYED_PROGRESS_BAR_COLOR.getIntegerValue());
+        matrices.pop();
     }
 
 }

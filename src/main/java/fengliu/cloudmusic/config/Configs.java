@@ -49,6 +49,9 @@ public class Configs implements IConfigHandler {
         public static final ConfigColor MUSIC_INFO_FONT_COLOR = ConfigUtil.addConfigColor("music.info.font.color", "#00858585");
         public static final ConfigColor LYRIC_COLOR = ConfigUtil.addConfigColor("lyric.color");
         public static final ConfigDouble LYRIC_SCALE = ConfigUtil.addConfigDouble("lyric.scale", 1.5);
+        public static final ConfigOptionList LYRIC_ANCHOR = ConfigUtil.addConfigOptionList("lyric.anchor", Anchor.TOP_LEFT);
+        public static final ConfigDouble MUSIC_INFO_SCALE = ConfigUtil.addConfigDouble("music.info.scale", 1.0);
+        public static final ConfigOptionList MUSIC_INFO_ANCHOR = ConfigUtil.addConfigOptionList("music.info.anchor", Anchor.TOP_RIGHT);
         public static final ConfigInteger LYRIC_X = ConfigUtil.addConfigInteger("lyric.x", 2, 0, 4000);
         public static final ConfigInteger LYRIC_Y = ConfigUtil.addConfigInteger("lyric.y", 5, 0, 3000);
         public static final ConfigString COOKIE = ConfigUtil.addConfigString("login.cookie");
@@ -110,6 +113,9 @@ public class Configs implements IConfigHandler {
                 MUSIC_INFO_FONT_COLOR,
                 LYRIC_COLOR,
                 LYRIC_SCALE,
+                LYRIC_ANCHOR,
+                MUSIC_INFO_SCALE,
+                MUSIC_INFO_ANCHOR,
                 LYRIC_X,
                 LYRIC_Y,
                 COOKIE,
@@ -197,6 +203,9 @@ public class Configs implements IConfigHandler {
         public static final ConfigColor MUSIC_INFO_FONT_COLOR = ALL.MUSIC_INFO_FONT_COLOR;
         public static final ConfigColor LYRIC_COLOR = ALL.LYRIC_COLOR;
         public static final ConfigDouble LYRIC_SCALE = ALL.LYRIC_SCALE;
+        public static final ConfigOptionList LYRIC_ANCHOR = ALL.LYRIC_ANCHOR;
+        public static final ConfigDouble MUSIC_INFO_SCALE = ALL.MUSIC_INFO_SCALE;
+        public static final ConfigOptionList MUSIC_INFO_ANCHOR = ALL.MUSIC_INFO_ANCHOR;
         public static final ConfigInteger LYRIC_X = ALL.LYRIC_X;
         public static final ConfigInteger LYRIC_Y = ALL.LYRIC_Y;
 
@@ -218,6 +227,9 @@ public class Configs implements IConfigHandler {
                 MUSIC_INFO_FONT_COLOR,
                 LYRIC_COLOR,
                 LYRIC_SCALE,
+                LYRIC_ANCHOR,
+                MUSIC_INFO_SCALE,
+                MUSIC_INFO_ANCHOR,
                 LYRIC_X,
                 LYRIC_Y
         );
