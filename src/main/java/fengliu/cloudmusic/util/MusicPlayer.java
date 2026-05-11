@@ -42,6 +42,7 @@ public class MusicPlayer implements Runnable {
     protected boolean notExitFlag = true;
     private boolean load;
     private boolean paused;
+    private volatile boolean cancelled;
     private int volumePercentage;
     private volatile long playingProgress;
     private long startPlayingTime;
@@ -160,9 +161,11 @@ public class MusicPlayer implements Runnable {
 
             CloudMusicClient.cacheHelper.addUseSize(file);
             this.client.inGameHud.setOverlayMessage(Text.translatable("record.nowPlaying", music.getName()), false);
+            if (this.cancelled) return;
             this.play(file);
         } else {
             this.client.inGameHud.setOverlayMessage(Text.translatable("record.nowPlaying", music.getName()), false);
+            if (this.cancelled) return;
             this.play(musicUrl);
         }
     }
@@ -171,6 +174,7 @@ public class MusicPlayer implements Runnable {
      * 播放歌曲
      */
     private void play(AudioInputStream audioInputStream) throws Exception {
+        this.cancelled = false;
         AudioFormat audioFormat = audioInputStream.getFormat();
         if (audioFormat.getEncoding() != AudioFormat.Encoding.PCM_SIGNED) {
             audioFormat = new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, audioFormat.getSampleRate(), 16, audioFormat.getChannels(), audioFormat.getChannels() * 2, audioFormat.getSampleRate(), false);
@@ -346,6 +350,8 @@ public class MusicPlayer implements Runnable {
             return;
         }
 
+        this.cancelled = true;
+
         synchronized (this) {
             this.load = true;
             notifyAll();
@@ -397,6 +403,7 @@ public class MusicPlayer implements Runnable {
      */
     public void exit() {
         this.paused = false;
+        this.cancelled = true;
         this.loopPlayIn = false;
         this.notExitFlag = false;
         next();
