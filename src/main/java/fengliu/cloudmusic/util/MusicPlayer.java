@@ -20,6 +20,7 @@ import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -152,8 +153,27 @@ public class MusicPlayer implements Runnable {
 
         this.playingMusic = music;
         if (Configs.PLAY.STREAMING.getBooleanValue()) {
+            String[] urls = musicUrl.split("\\.");
+            String fileType = urls[urls.length - 1];
+            String prefix = music instanceof DjMusic ? "djmusic_" : "";
+            File cacheFile = CloudMusicClient.cacheHelper.getWaitCacheFile(prefix + music.getId() + "." + fileType);
+
             this.client.inGameHud.setOverlayMessage(Text.translatable("record.nowPlaying", music.getName()), false);
-            this.playStreaming(musicUrl);
+
+            if (cacheFile.exists()) {
+                this.play(cacheFile);
+            } else {
+                Thread downloader = new Thread(() -> {
+                    try {
+                        File f = HttpClient.download(musicUrl, cacheFile);
+                        CloudMusicClient.cacheHelper.addUseSize(f);
+                    } catch (Exception ignored) {}
+                });
+                downloader.setDaemon(true);
+                downloader.setName("CloudMusic cache download thread");
+                downloader.start();
+                this.playStreaming(musicUrl);
+            }
         } else {
             String[] urls = musicUrl.split("\\.");
             String fileType = urls[urls.length - 1];
@@ -303,13 +323,20 @@ public class MusicPlayer implements Runnable {
                 while (!eof && !cancelled) {
                     while (queuedCount < 4 && !eof) {
                         int totalRead = 0;
+                        int retries = 0;
                         while (totalRead < chunkSize && !eof) {
-                            int read = rawIn.read(chunkBuf, totalRead, chunkSize - totalRead);
-                            if (read == -1) {
-                                eof = true;
-                                break;
+                            try {
+                                int read = rawIn.read(chunkBuf, totalRead, chunkSize - totalRead);
+                                if (read == -1) {
+                                    eof = true;
+                                    break;
+                                }
+                                totalRead += read;
+                                retries = 0;
+                            } catch (IOException e) {
+                                if (++retries > 3) throw e;
+                                Thread.sleep(500L * retries);
                             }
-                            totalRead += read;
                         }
                         if (totalRead == 0) break;
 
