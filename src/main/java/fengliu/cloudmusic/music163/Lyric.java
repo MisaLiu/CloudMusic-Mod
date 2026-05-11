@@ -13,6 +13,7 @@ public class Lyric {
     private final String[] texts;
     private final String[] trans;
     private volatile String[] toLyric = {};
+    private int lastIndex = -1;
 
     /**
      * 将歌词时间字符串转换为毫秒
@@ -26,8 +27,11 @@ public class Lyric {
 
             int minute = Integer.parseInt(timeStr[0]) * 60 * 1000;
             int second = Integer.parseInt(secondStr[0]) * 1000;
-            int millisecond = Integer.parseInt(secondStr[1]) * 10;
-            return minute + second + millisecond;
+            int frac = Integer.parseInt(secondStr[1]);
+            if (secondStr[1].length() <= 2) {
+                frac *= 10;
+            }
+            return minute + second + frac;
         }catch (Exception err){
             return 0;
         }
@@ -82,6 +86,17 @@ public class Lyric {
             trans[i] = tlyricMap.get(entry.getKey());
             i++;
         }
+
+        StringBuilder sb = new StringBuilder("[LYRIC_PARSE] timestamps: ");
+        StringBuilder gap = new StringBuilder("[LYRIC_PARSE] gaps: ");
+        for (int j = 0; j < times.length; j++) {
+            sb.append(times[j]).append("ms ");
+            if (j > 0) {
+                gap.append(times[j] - times[j - 1]).append("ms ");
+            }
+        }
+        System.out.println(sb);
+        System.out.println(gap);
     }
 
     /**
@@ -94,13 +109,16 @@ public class Lyric {
             index = i;
         }
 
-        if (index >= 0) {
-            String t = trans[index];
-            if (t != null) {
-                this.toLyric = new String[]{texts[index], t};
+        if (index > lastIndex) {
+            if (trans[index] != null) {
+                this.toLyric = new String[]{texts[index], trans[index]};
             } else {
                 this.toLyric = new String[]{texts[index]};
             }
+            lastIndex = index;
+            System.out.printf("[LYRIC] update(progress=%dms) -> index=%d/%d -> \"%s\"%n",
+                    playingProgress, index, times.length - 1,
+                    this.toLyric.length > 0 ? this.toLyric[0] : "");
         }
     }
 
