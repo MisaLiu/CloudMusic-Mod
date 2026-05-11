@@ -3,17 +3,20 @@ package fengliu.cloudmusic.music163.data;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import fengliu.cloudmusic.CloudMusicClient;
 import fengliu.cloudmusic.config.Configs;
 import fengliu.cloudmusic.music163.*;
 import fengliu.cloudmusic.util.HttpClient;
 import fengliu.cloudmusic.util.IdUtil;
 import fengliu.cloudmusic.util.TextClickItem;
 import fengliu.cloudmusic.util.page.Page;
+import fi.dy.masa.malilib.util.JsonUtils;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -129,7 +132,18 @@ public class Music extends Music163Obj implements IMusic, ICanComment {
         data.put("lv", 0);
         data.put("tv", 0);
 
-        return new Lyric(this.api.POST_API("/api/song/lyric", data));
+        File cacheFile = CloudMusicClient.cacheHelper.getWaitCacheFile("lyric_" + this.id + ".json");
+        if (cacheFile.exists()) {
+            JsonElement element = JsonUtils.parseJsonFile(cacheFile);
+            if (element != null && element.isJsonObject()) {
+                return new Lyric(element.getAsJsonObject());
+            }
+        }
+
+        JsonObject result = this.api.POST_API("/api/song/lyric", data);
+        JsonUtils.writeJsonToFile(result, cacheFile);
+        CloudMusicClient.cacheHelper.addUseSize(cacheFile);
+        return new Lyric(result);
     }
 
     /**

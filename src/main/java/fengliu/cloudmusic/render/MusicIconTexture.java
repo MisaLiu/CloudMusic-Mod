@@ -10,8 +10,8 @@ import net.minecraft.client.texture.NativeImage;
 import net.minecraft.client.texture.NativeImageBackedTexture;
 import net.minecraft.util.Identifier;
 
-import java.io.File;
-import java.io.FileInputStream;
+import java.io.*;
+import java.nio.file.Files;
 
 public class MusicIconTexture {
     private static final MinecraftClient client = MinecraftClient.getInstance();
@@ -28,7 +28,17 @@ public class MusicIconTexture {
         Thread commandThread = new Thread(() -> {
             NativeImage img;
             try {
-                img = NativeImage.read(PNGConverter.convertJPEGtoPNG(HttpClient.downloadStream(music.getPicUrl() + "?param=128y128")));
+                File cacheFile = CloudMusicClient.cacheHelper.getWaitCacheFile("icon_" + music.getId() + ".png");
+                if (cacheFile.exists()) {
+                    img = NativeImage.read(new FileInputStream(cacheFile));
+                } else {
+                    InputStream jpgStream = HttpClient.downloadStream(music.getPicUrl() + "?param=128y128");
+                    ByteArrayInputStream pngStream = PNGConverter.convertJPEGtoPNG(jpgStream);
+                    byte[] pngBytes = pngStream.readAllBytes();
+                    Files.write(cacheFile.toPath(), pngBytes);
+                    CloudMusicClient.cacheHelper.addUseSize(cacheFile);
+                    img = NativeImage.read(new ByteArrayInputStream(pngBytes));
+                }
             } catch (Exception err) {
                 err.printStackTrace();
                 return;
