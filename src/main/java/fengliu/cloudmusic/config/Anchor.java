@@ -52,6 +52,14 @@ public enum Anchor implements IConfigOptionListEntry {
         };
     }
 
+    public static float alignedX(Anchor a, float baseX, float elementWidth, float textWidth) {
+        return switch (a) {
+            case TOP_LEFT, CENTER_LEFT, BOTTOM_LEFT -> baseX;
+            case TOP_CENTER, CENTER, BOTTOM_CENTER -> baseX + (elementWidth - textWidth) / 2f;
+            case TOP_RIGHT, CENTER_RIGHT, BOTTOM_RIGHT -> baseX + elementWidth - textWidth;
+        };
+    }
+
     @Override
     public String getStringValue() {
         return this.name();
@@ -76,7 +84,7 @@ public enum Anchor implements IConfigOptionListEntry {
     @Override
     public IConfigOptionListEntry fromString(String value) {
         for (Anchor a : values()) {
-            if (a.getDisplayName().equals(value)) return a;
+            if (a.getStringValue().equals(value)) return a;
         }
         return TOP_LEFT;
     }

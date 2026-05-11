@@ -74,7 +74,8 @@ public abstract class InGameHudMixin {
             matrices.translate(-ax, -ay, 0);
             float ly = py;
             for (String lyric : lines) {
-                drawContext.drawText(client.textRenderer, lyric, (int) px, (int) ly, lyricColor, true);
+                float tx = Anchor.alignedX(anchor, px, lyricWidth, client.textRenderer.getWidth(lyric));
+                drawContext.drawText(client.textRenderer, lyric, (int) tx, (int) ly, lyricColor, true);
                 ly += 10;
             }
             matrices.pop();
