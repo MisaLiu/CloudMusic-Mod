@@ -114,6 +114,7 @@ public class MusicPlayer implements Runnable {
      * 播放歌曲
      */
     protected void playMusic() {
+        this.cancelled = false;
         IMusic music = this.playList.get(this.playIn);
 
         String musicUrl;
@@ -174,7 +175,6 @@ public class MusicPlayer implements Runnable {
      * 播放歌曲
      */
     private void play(AudioInputStream audioInputStream) throws Exception {
-        this.cancelled = false;
         AudioFormat audioFormat = audioInputStream.getFormat();
         if (audioFormat.getEncoding() != AudioFormat.Encoding.PCM_SIGNED) {
             audioFormat = new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, audioFormat.getSampleRate(), 16, audioFormat.getChannels(), audioFormat.getChannels() * 2, audioFormat.getSampleRate(), false);
