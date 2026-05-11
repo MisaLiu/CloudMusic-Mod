@@ -86,17 +86,6 @@ public class Lyric {
             trans[i] = tlyricMap.get(entry.getKey());
             i++;
         }
-
-        StringBuilder sb = new StringBuilder("[LYRIC_PARSE] timestamps: ");
-        StringBuilder gap = new StringBuilder("[LYRIC_PARSE] gaps: ");
-        for (int j = 0; j < times.length; j++) {
-            sb.append(times[j]).append("ms ");
-            if (j > 0) {
-                gap.append(times[j] - times[j - 1]).append("ms ");
-            }
-        }
-        System.out.println(sb);
-        System.out.println(gap);
     }
 
     /**
@@ -116,9 +105,6 @@ public class Lyric {
                 this.toLyric = new String[]{texts[index]};
             }
             lastIndex = index;
-            System.out.printf("[LYRIC] update(progress=%dms) -> index=%d/%d -> \"%s\"%n",
-                    playingProgress, index, times.length - 1,
-                    this.toLyric.length > 0 ? this.toLyric[0] : "");
         }
     }
 

@@ -6,7 +6,6 @@ import net.minecraft.client.sound.SoundInstance;
 import net.minecraft.client.sound.SoundSystem;
 import net.minecraft.sound.SoundCategory;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -18,41 +17,18 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(SoundSystem.class)
 public abstract class SoundSystemMixin {
 
-    @Unique
-    public SoundCategory currentCategory;
-
-    /**
-     * 判断是否需要停止播放背景音乐
-     * @param soundCategory 音乐类
-     * @return false 不播放
-     */
-    @Unique
-    private static boolean canStopGameMusic(SoundCategory soundCategory){
+    @Inject(method = "play(Lnet/minecraft/client/sound/SoundInstance;)V", at = @At("HEAD"), cancellable = true)
+    public void play(SoundInstance soundInstance, CallbackInfo ci) {
         if (!Configs.PLAY.NOT_PLAY_GAME_MUSIC.getBooleanValue()){
-            return false;
+            return;
         }
 
         if (!MusicCommand.getPlayer().isPlaying()) {
-            return false;
-        }
-
-        return soundCategory == SoundCategory.MUSIC;
-    }
-
-    @Inject(method = "play(Lnet/minecraft/client/sound/SoundInstance;)V", at = @At("HEAD"), cancellable = true)
-    public void play(SoundInstance soundInstance, CallbackInfo ci) {
-        currentCategory = soundInstance.getCategory();
-        if (!canStopGameMusic(soundInstance.getCategory())){
             return;
         }
-        ci.cancel();
-    }
 
-    @Inject(method = "tick()V", at = @At("HEAD"), cancellable = true)
-    public void tick(CallbackInfo ci) {
-        if (!canStopGameMusic(currentCategory)){
-            return;
+        if (soundInstance.getCategory() == SoundCategory.MUSIC) {
+            ci.cancel();
         }
-        ci.cancel();
     }
 }

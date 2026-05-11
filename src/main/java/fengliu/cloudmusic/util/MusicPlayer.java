@@ -25,7 +25,6 @@ import java.nio.ByteBuffer;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 /**
  * 歌曲播放对象
@@ -429,16 +428,16 @@ public class MusicPlayer implements Runnable {
         this.paused = false;
         this.startPlayingTime = System.currentTimeMillis() - this.playingProgress;
 
-        synchronized (this) {
-            this.load = true;
-            notifyAll();
-        }
-
         if (this.audioClip != null) {
             try {
                 this.audioClip.play();
             } catch (Exception ignored) {
             }
+        }
+
+        synchronized (this) {
+            this.load = true;
+            notifyAll();
         }
 
         this.loopPlayIn = true;
