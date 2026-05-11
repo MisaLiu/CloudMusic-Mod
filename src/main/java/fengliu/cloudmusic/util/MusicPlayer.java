@@ -124,9 +124,8 @@ public class MusicPlayer implements Runnable {
         try {
             musicUrl = music.getPlayUrl();
         } catch (ActionException err) {
-            MinecraftClient client = MinecraftClient.getInstance();
-            if (client.player != null) {
-                client.player.sendMessage(Text.literal(err.getMessage()), false);
+            if (this.client.player != null) {
+                this.client.player.sendMessage(Text.literal(err.getMessage()), false);
             }
             this.stop();
             return;

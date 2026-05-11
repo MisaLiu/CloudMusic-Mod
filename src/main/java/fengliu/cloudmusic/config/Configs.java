@@ -23,7 +23,7 @@ public class Configs implements IConfigHandler {
 
     public static class ALL {
         public static final ConfigInteger VOLUME = ConfigUtil.addConfigInteger("volume", 80, 0, 100);
-        public static final ConfigBoolean STREAMING = ConfigUtil.addConfigBoolean("streaming", true);
+        public static final ConfigBoolean PLAY_STREAMING = ConfigUtil.addConfigBoolean("play.streaming", true);
         public static final ConfigBooleanHotkeyed PLAY_LOOP = ConfigUtil.addConfigBooleanHotkeyed("play.loop");
         public static final ConfigBooleanHotkeyed PLAY_AUTO_RANDOM = ConfigUtil.addConfigBooleanHotkeyed("play.auto.random", false, "");
         public static final ConfigOptionList PLAY_QUALITY = ConfigUtil.addConfigOptionList("play.quality", Quality.EXHIGH);
@@ -87,7 +87,7 @@ public class Configs implements IConfigHandler {
 
         public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(
                 VOLUME,
-                STREAMING,
+                PLAY_STREAMING,
                 PLAY_LOOP,
                 PLAY_AUTO_RANDOM,
                 PLAY_QUALITY,
@@ -152,7 +152,7 @@ public class Configs implements IConfigHandler {
 
     public static class PLAY {
         public static final ConfigInteger VOLUME = ALL.VOLUME;
-        public static final ConfigBoolean STREAMING = ALL.STREAMING;
+        public static final ConfigBoolean STREAMING = ALL.PLAY_STREAMING;
         public static final ConfigBooleanHotkeyed PLAY_LOOP = ALL.PLAY_LOOP;
         public static final ConfigBooleanHotkeyed PLAY_AUTO_RANDOM = ALL.PLAY_AUTO_RANDOM;
         public static final ConfigOptionList PLAY_QUALITY = ALL.PLAY_QUALITY;
