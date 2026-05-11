@@ -35,6 +35,7 @@ public class MusicPlayer implements Runnable {
     protected final List<IMusic> playList;
     private IMusic playingMusic = null;
     private ALAudioClip audioClip;
+    private ALAudioBuffer currentBuffer;
     private Lyric lyric;
     protected int playIn = 0;
     protected int playListSize;
@@ -189,6 +190,7 @@ public class MusicPlayer implements Runnable {
         byteBuffer.put(pcmData);
         byteBuffer.flip();
         ALAudioBuffer audioBuffer = new ALAudioBuffer(byteBuffer, audioFormat);
+        this.currentBuffer = audioBuffer;
 
         CompletableFuture<ALAudioClip> future = new CompletableFuture<>();
         client.execute(() -> {
@@ -242,6 +244,13 @@ public class MusicPlayer implements Runnable {
 
         this.playingProgress = 0;
         this.lyric = null;
+        if (this.currentBuffer != null) {
+            try {
+                this.currentBuffer.delete();
+            } catch (Exception ignored) {
+            }
+            this.currentBuffer = null;
+        }
         if (this.audioClip != null) {
             this.audioClip.close();
             this.audioClip = null;
