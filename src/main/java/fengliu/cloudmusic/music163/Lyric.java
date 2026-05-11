@@ -22,9 +22,19 @@ public class Lyric {
     public static long timeStrToTime(String n){
         try{
             String[] timeStr = n.split(":");
-            String[] secondStr = timeStr[1].split("\\.");
 
             int minute = Integer.parseInt(timeStr[0]) * 60 * 1000;
+
+            if (timeStr.length == 3) {
+                int second = Integer.parseInt(timeStr[1]) * 1000;
+                int frac = Integer.parseInt(timeStr[2]);
+                if (timeStr[2].length() <= 2) {
+                    frac *= 10;
+                }
+                return minute + second + frac;
+            }
+
+            String[] secondStr = timeStr[1].split("\\.");
             int second = Integer.parseInt(secondStr[0]) * 1000;
             int frac = Integer.parseInt(secondStr[1]);
             if (secondStr[1].length() <= 2) {
