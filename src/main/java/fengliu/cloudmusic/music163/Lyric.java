@@ -13,7 +13,6 @@ public class Lyric {
     private final String[] texts;
     private final String[] trans;
     private volatile String[] toLyric = {};
-    private int lastIndex = -1;
 
     /**
      * 将歌词时间字符串转换为毫秒
@@ -98,13 +97,12 @@ public class Lyric {
             index = i;
         }
 
-        if (index > lastIndex) {
+        if (index >= 0) {
             if (trans[index] != null) {
                 this.toLyric = new String[]{texts[index], trans[index]};
             } else {
                 this.toLyric = new String[]{texts[index]};
             }
-            lastIndex = index;
         }
     }
 
