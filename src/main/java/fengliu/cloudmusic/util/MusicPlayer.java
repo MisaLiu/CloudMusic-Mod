@@ -14,6 +14,7 @@ import net.minecraft.text.Text;
 
 import de.keksuccino.melody.resources.audio.openal.ALAudioBuffer;
 import de.keksuccino.melody.resources.audio.openal.ALAudioClip;
+import org.lwjgl.openal.AL10;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
@@ -35,6 +36,7 @@ public class MusicPlayer implements Runnable {
     private IMusic playingMusic = null;
     private ALAudioClip audioClip;
     private ALAudioBuffer currentBuffer;
+    private int streamingSource;
     private Lyric lyric;
     protected int playIn = 0;
     protected int playListSize;
@@ -149,7 +151,10 @@ public class MusicPlayer implements Runnable {
         }
 
         this.playingMusic = music;
-        if (!Configs.PLAY.PLAY_URL.getBooleanValue()) {
+        if (Configs.PLAY.STREAMING.getBooleanValue()) {
+            this.client.inGameHud.setOverlayMessage(Text.translatable("record.nowPlaying", music.getName()), false);
+            this.playStreaming(musicUrl);
+        } else {
             String[] urls = musicUrl.split("\\.");
             String fileType = urls[urls.length - 1];
 
@@ -164,10 +169,6 @@ public class MusicPlayer implements Runnable {
             this.client.inGameHud.setOverlayMessage(Text.translatable("record.nowPlaying", music.getName()), false);
             if (this.cancelled) return;
             this.play(file);
-        } else {
-            this.client.inGameHud.setOverlayMessage(Text.translatable("record.nowPlaying", music.getName()), false);
-            if (this.cancelled) return;
-            this.play(musicUrl);
         }
     }
 
@@ -265,9 +266,132 @@ public class MusicPlayer implements Runnable {
      *
      * @param url 歌曲 url
      */
-    private void play(String url) {
+    private void playStreaming(String url) {
         try {
-            this.play(AudioSystem.getAudioInputStream(AudioSystem.getAudioInputStream(new URL(url))));
+            AudioInputStream rawIn = AudioSystem.getAudioInputStream(new URL(url));
+            AudioFormat rawFormat = rawIn.getFormat();
+            if (rawFormat.getEncoding() != AudioFormat.Encoding.PCM_SIGNED) {
+                AudioFormat pcmFormat = new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, rawFormat.getSampleRate(), 16, rawFormat.getChannels(), rawFormat.getChannels() * 2, rawFormat.getSampleRate(), false);
+                rawIn = AudioSystem.getAudioInputStream(pcmFormat, rawIn);
+            }
+            AudioFormat audioFormat = rawIn.getFormat();
+
+            CompletableFuture<Integer> srcFuture = new CompletableFuture<>();
+            client.execute(() -> {
+                try {
+                    srcFuture.complete(AL10.alGenSources());
+                } catch (Exception ex) {
+                    srcFuture.completeExceptionally(ex);
+                }
+            });
+            this.streamingSource = srcFuture.get();
+
+            int alFormat = audioFormat.getChannels() == 2 ? AL10.AL_FORMAT_STEREO16 : AL10.AL_FORMAT_MONO16;
+            int chunkSize = 65536;
+            byte[] chunkBuf = new byte[chunkSize];
+
+            boolean eof = false;
+            int[] streamingBuffers = new int[0];
+            int queuedCount = 0;
+
+            try {
+                this.load = true;
+                this.paused = false;
+                this.startPlayingTime = System.currentTimeMillis();
+                this.volumeSet(volumePercentage);
+
+                while (!eof && !cancelled) {
+                    while (queuedCount < 4 && !eof) {
+                        int totalRead = 0;
+                        while (totalRead < chunkSize && !eof) {
+                            int read = rawIn.read(chunkBuf, totalRead, chunkSize - totalRead);
+                            if (read == -1) {
+                                eof = true;
+                                break;
+                            }
+                            totalRead += read;
+                        }
+                        if (totalRead == 0) break;
+
+                        ByteBuffer buf = ByteBuffer.allocateDirect(totalRead);
+                        buf.put(chunkBuf, 0, totalRead);
+                        buf.flip();
+
+                        int newBuf = AL10.alGenBuffers();
+                        AL10.alBufferData(newBuf, alFormat, buf, (int) audioFormat.getSampleRate());
+
+                        int[] enlarged = new int[streamingBuffers.length + 1];
+                        System.arraycopy(streamingBuffers, 0, enlarged, 0, streamingBuffers.length);
+                        enlarged[streamingBuffers.length] = newBuf;
+                        streamingBuffers = enlarged;
+
+                        AL10.alSourceQueueBuffers(this.streamingSource, newBuf);
+                        queuedCount++;
+                    }
+
+                    if (queuedCount == 0) break;
+
+                    if (AL10.alGetSourcei(this.streamingSource, AL10.AL_SOURCE_STATE) != AL10.AL_PLAYING) {
+                        AL10.alSourcePlay(this.streamingSource);
+                    }
+
+                    while (queuedCount > 0 || !eof) {
+                        synchronized (this) {
+                            if (!this.load) {
+                                AL10.alSourcePause(this.streamingSource);
+                                this.playingProgress = System.currentTimeMillis() - this.startPlayingTime;
+                                while (!this.load) {
+                                    wait();
+                                }
+                                this.startPlayingTime = System.currentTimeMillis() - this.playingProgress;
+                                AL10.alSourcePlay(this.streamingSource);
+                            }
+                        }
+
+                        if (cancelled) break;
+
+                        int processed = AL10.alGetSourcei(this.streamingSource, AL10.AL_BUFFERS_PROCESSED);
+                        while (processed-- > 0) {
+                            int buf = AL10.alSourceUnqueueBuffers(this.streamingSource);
+                            AL10.alDeleteBuffers(buf);
+                            queuedCount--;
+                        }
+
+                        if (eof && queuedCount == 0) break;
+
+                        if (this.streamingSource != 0 && AL10.alGetSourcei(this.streamingSource, AL10.AL_SOURCE_STATE) == AL10.AL_STOPPED && queuedCount == 0) {
+                            break;
+                        }
+
+                        if (this.streamingSource != 0) {
+                            this.playingProgress = System.currentTimeMillis() - this.startPlayingTime;
+                            if (lyric != null) {
+                                lyric.update(this.playingProgress);
+                            }
+                        }
+
+                        Thread.sleep(20);
+                        break;
+                    }
+                }
+            } finally {
+                this.playingProgress = 0;
+
+                if (this.streamingSource != 0) {
+                    AL10.alSourceStop(this.streamingSource);
+                    int toUnqueue = AL10.alGetSourcei(this.streamingSource, AL10.AL_BUFFERS_QUEUED);
+                    while (toUnqueue-- > 0) {
+                        AL10.alSourceUnqueueBuffers(this.streamingSource);
+                    }
+                    AL10.alDeleteSources(new int[]{this.streamingSource});
+                    this.streamingSource = 0;
+                }
+                for (int buf : streamingBuffers) {
+                    AL10.alDeleteBuffers(buf);
+                }
+
+                this.lyric = null;
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -301,13 +425,13 @@ public class MusicPlayer implements Runnable {
         }
 
         this.volumePercentage = volume;
-        if (this.audioClip == null) {
-            return;
-        }
-
-        try {
-            this.audioClip.setVolume(volume / 100.0f);
-        } catch (Exception ignored) {
+        if (this.streamingSource != 0) {
+            AL10.alSourcef(this.streamingSource, AL10.AL_GAIN, volume / 100.0f);
+        } else if (this.audioClip != null) {
+            try {
+                this.audioClip.setVolume(volume / 100.0f);
+            } catch (Exception ignored) {
+            }
         }
 
         Configs.PLAY.VOLUME.setIntegerValue(this.volumePercentage);
@@ -357,6 +481,11 @@ public class MusicPlayer implements Runnable {
             notifyAll();
         }
 
+        if (this.streamingSource != 0) {
+            AL10.alSourceStop(this.streamingSource);
+            AL10.alDeleteSources(new int[]{this.streamingSource});
+            this.streamingSource = 0;
+        }
         if (this.audioClip != null) {
             try {
                 this.audioClip.stop();
@@ -414,7 +543,9 @@ public class MusicPlayer implements Runnable {
      */
     public void stop() {
         this.paused = true;
-        if (this.audioClip != null) {
+        if (this.streamingSource != 0) {
+            AL10.alSourcePause(this.streamingSource);
+        } else if (this.audioClip != null) {
             try {
                 this.audioClip.pause();
             } catch (Exception ignored) {
@@ -435,7 +566,9 @@ public class MusicPlayer implements Runnable {
         this.paused = false;
         this.startPlayingTime = System.currentTimeMillis() - this.playingProgress;
 
-        if (this.audioClip != null) {
+        if (this.streamingSource != 0) {
+            AL10.alSourcePlay(this.streamingSource);
+        } else if (this.audioClip != null) {
             try {
                 this.audioClip.play();
             } catch (Exception ignored) {

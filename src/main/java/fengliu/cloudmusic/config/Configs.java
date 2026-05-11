@@ -4,6 +4,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import fengliu.cloudmusic.CloudMusicClient;
+import fengliu.cloudmusic.config.Anchor;
 import fengliu.cloudmusic.music163.Quality;
 import fengliu.cloudmusic.util.ConfigUtil;
 import fi.dy.masa.malilib.config.ConfigUtils;
@@ -22,7 +23,7 @@ public class Configs implements IConfigHandler {
 
     public static class ALL {
         public static final ConfigInteger VOLUME = ConfigUtil.addConfigInteger("volume", 80, 0, 100);
-        public static final ConfigBoolean PLAY_URL = ConfigUtil.addConfigBoolean("play.url");
+        public static final ConfigBoolean STREAMING = ConfigUtil.addConfigBoolean("streaming", true);
         public static final ConfigBooleanHotkeyed PLAY_LOOP = ConfigUtil.addConfigBooleanHotkeyed("play.loop");
         public static final ConfigBooleanHotkeyed PLAY_AUTO_RANDOM = ConfigUtil.addConfigBooleanHotkeyed("play.auto.random", false, "");
         public static final ConfigOptionList PLAY_QUALITY = ConfigUtil.addConfigOptionList("play.quality", Quality.EXHIGH);
@@ -86,7 +87,7 @@ public class Configs implements IConfigHandler {
 
         public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(
                 VOLUME,
-                PLAY_URL,
+                STREAMING,
                 PLAY_LOOP,
                 PLAY_AUTO_RANDOM,
                 PLAY_QUALITY,
@@ -151,7 +152,7 @@ public class Configs implements IConfigHandler {
 
     public static class PLAY {
         public static final ConfigInteger VOLUME = ALL.VOLUME;
-        public static final ConfigBoolean PLAY_URL = ALL.PLAY_URL;
+        public static final ConfigBoolean STREAMING = ALL.STREAMING;
         public static final ConfigBooleanHotkeyed PLAY_LOOP = ALL.PLAY_LOOP;
         public static final ConfigBooleanHotkeyed PLAY_AUTO_RANDOM = ALL.PLAY_AUTO_RANDOM;
         public static final ConfigOptionList PLAY_QUALITY = ALL.PLAY_QUALITY;
@@ -168,7 +169,7 @@ public class Configs implements IConfigHandler {
 
         public static final ImmutableList<IConfigBase> OPTIONS = ImmutableList.of(
                 VOLUME,
-                PLAY_URL,
+                STREAMING,
                 PLAY_LOOP,
                 PLAY_AUTO_RANDOM,
                 PLAY_QUALITY,
