@@ -20,9 +20,9 @@ import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.IOException;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -291,7 +291,7 @@ public class MusicPlayer implements Runnable {
             byte[] chunkBuf = new byte[chunkSize];
 
             boolean eof = false;
-            int[] streamingBuffers = new int[0];
+            ArrayList<Integer> streamingBuffers = new ArrayList<>();
             int queuedCount = 0;
 
             try {
@@ -320,11 +320,7 @@ public class MusicPlayer implements Runnable {
                         int newBuf = AL10.alGenBuffers();
                         AL10.alBufferData(newBuf, alFormat, buf, (int) audioFormat.getSampleRate());
 
-                        int[] enlarged = new int[streamingBuffers.length + 1];
-                        System.arraycopy(streamingBuffers, 0, enlarged, 0, streamingBuffers.length);
-                        enlarged[streamingBuffers.length] = newBuf;
-                        streamingBuffers = enlarged;
-
+                        streamingBuffers.add(newBuf);
                         AL10.alSourceQueueBuffers(this.streamingSource, newBuf);
                         queuedCount++;
                     }
@@ -352,8 +348,10 @@ public class MusicPlayer implements Runnable {
 
                         int processed = AL10.alGetSourcei(this.streamingSource, AL10.AL_BUFFERS_PROCESSED);
                         while (processed-- > 0) {
-                            int buf = AL10.alSourceUnqueueBuffers(this.streamingSource);
-                            AL10.alDeleteBuffers(buf);
+                            int[] unqueued = new int[1];
+                            AL10.alSourceUnqueueBuffers(this.streamingSource, unqueued);
+                            AL10.alDeleteBuffers(unqueued);
+                            streamingBuffers.remove((Integer) unqueued[0]);
                             queuedCount--;
                         }
 
@@ -381,13 +379,12 @@ public class MusicPlayer implements Runnable {
                     AL10.alSourceStop(this.streamingSource);
                     int toUnqueue = AL10.alGetSourcei(this.streamingSource, AL10.AL_BUFFERS_QUEUED);
                     while (toUnqueue-- > 0) {
-                        AL10.alSourceUnqueueBuffers(this.streamingSource);
+                        int[] buf = new int[1];
+                        AL10.alSourceUnqueueBuffers(this.streamingSource, buf);
+                        AL10.alDeleteBuffers(buf);
                     }
                     AL10.alDeleteSources(new int[]{this.streamingSource});
                     this.streamingSource = 0;
-                }
-                for (int buf : streamingBuffers) {
-                    AL10.alDeleteBuffers(buf);
                 }
 
                 this.lyric = null;
@@ -483,6 +480,12 @@ public class MusicPlayer implements Runnable {
 
         if (this.streamingSource != 0) {
             AL10.alSourceStop(this.streamingSource);
+            int toUnqueue = AL10.alGetSourcei(this.streamingSource, AL10.AL_BUFFERS_QUEUED);
+            while (toUnqueue-- > 0) {
+                int[] buf = new int[1];
+                AL10.alSourceUnqueueBuffers(this.streamingSource, buf);
+                AL10.alDeleteBuffers(buf);
+            }
             AL10.alDeleteSources(new int[]{this.streamingSource});
             this.streamingSource = 0;
         }
