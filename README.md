@@ -1,16 +1,16 @@
 # CloudMusic-Mod [Fabric]
 
-#### 在 mc 中内置网易云歌曲播放器
+在 mc 中内置网易云歌曲播放器
 
-#### 前置: MaliLib, Fabric API
+**前置: [Melody](https://modrinth.com/mod/melody), [MaliLib](https://modrinth.com/mod/malilib), [Fabric API](https://modrinth.com/mod/fabric-api)**
 
-#### 出现任何问题在 Issues 前请检查 mod 版本是否为最新
+出现任何问题在 Issues 前请检查 mod 版本是否为最新
 
 ![logo.png](https://github.com/FengLiuFeseliud/CloudMusic-Mod/blob/main/src/main/resources/assets/cloudmusic/icon.png?raw=true)
 
 ![run.png](https://github.com/FengLiuFeseliud/CloudMusic-Mod/blob/main/img/social.png?raw=true)
 
-#### [CloudMusicRoom-Mod](https://github.com/FengLiuFeseliud/CloudMusicRoom-Mod) 用于在服务器配合本 mod 一起听歌使用(正在开发) , 不安装一样保持纯客户端使用
+**[CloudMusicRoom-Mod](https://github.com/FengLiuFeseliud/CloudMusicRoom-Mod) 用于在服务器配合本 mod 一起听歌使用(正在开发) , 不安装一样保持纯客户端使用**
 
 ![image](https://github.com/FengLiuFeseliud/CloudMusicRoom-Mod/raw/main/src/main/resources/assets/cloudmusicroom/icon.png?raw=true)
 
