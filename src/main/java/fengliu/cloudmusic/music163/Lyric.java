@@ -2,7 +2,9 @@ package fengliu.cloudmusic.music163;
 
 import com.google.gson.JsonObject;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -53,14 +55,25 @@ public class Lyric {
      */
     public static Map<Long, String> lyricToMap(String lyric){
         Map<Long, String> lyricMap = new LinkedHashMap<>();
-        for (String lyricRow : lyric.split("\n")) {
+        for (String row : lyric.split("\n")) {
             try {
-                String[] lyricRows = lyricRow.substring(1).split("]", 2);
-                if (lyricRows.length < 2){
-                    continue;
+                String remaining = row.trim();
+                if (remaining.isEmpty()) continue;
+
+                List<Long> timestamps = new ArrayList<>();
+                while (remaining.startsWith("[")) {
+                    int end = remaining.indexOf("]");
+                    if (end == -1) break;
+                    timestamps.add(timeStrToTime(remaining.substring(1, end)));
+                    remaining = remaining.substring(end + 1);
                 }
 
-                lyricMap.put(timeStrToTime(lyricRows[0]), lyricRows[1]);
+                String text = remaining.trim();
+                if (timestamps.isEmpty() || text.isEmpty()) continue;
+
+                for (long time : timestamps) {
+                    lyricMap.put(time, text);
+                }
             }catch(Exception err){
             }
         }
@@ -85,11 +98,14 @@ public class Lyric {
             tlyricMap = new LinkedHashMap<>();
         }
 
-        this.times = new long[lyricMap.size()];
-        this.texts = new String[lyricMap.size()];
-        this.trans = new String[lyricMap.size()];
+        List<Map.Entry<Long, String>> sorted = new ArrayList<>(lyricMap.entrySet());
+        sorted.sort(Map.Entry.comparingByKey());
+
+        this.times = new long[sorted.size()];
+        this.texts = new String[sorted.size()];
+        this.trans = new String[sorted.size()];
         int i = 0;
-        for (Map.Entry<Long, String> entry : lyricMap.entrySet()) {
+        for (Map.Entry<Long, String> entry : sorted) {
             times[i] = entry.getKey();
             texts[i] = entry.getValue();
             trans[i] = tlyricMap.get(entry.getKey());
