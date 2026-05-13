@@ -23,7 +23,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -306,12 +305,12 @@ public class MusicPlayer implements Runnable {
             this.streamingSource = srcFuture.get();
 
             int alFormat = audioFormat.getChannels() == 2 ? AL10.AL_FORMAT_STEREO16 : AL10.AL_FORMAT_MONO16;
-            int chunkSize = 65536;
+            int sampleRate = (int) audioFormat.getSampleRate();
+            int chunkSize = 16384;
             byte[] chunkBuf = new byte[chunkSize];
 
-            boolean eof = false;
-            ArrayList<Integer> streamingBuffers = new ArrayList<>();
             int queuedCount = 0;
+            boolean eof = false;
 
             try {
                 this.load = true;
@@ -319,23 +318,35 @@ public class MusicPlayer implements Runnable {
                 this.startPlayingTime = System.currentTimeMillis();
                 this.volumeSet(volumePercentage);
 
-                while (!eof && !cancelled) {
-                    while (queuedCount < 4 && !eof) {
-                        int totalRead = 0;
-                        int retries = 0;
-                        while (totalRead < chunkSize && !eof) {
-                            try {
-                                int read = rawIn.read(chunkBuf, totalRead, chunkSize - totalRead);
-                                if (read == -1) {
-                                    eof = true;
-                                    break;
-                                }
-                                totalRead += read;
-                                retries = 0;
-                            } catch (IOException e) {
-                                if (++retries > 3) throw e;
-                                Thread.sleep(500L * retries);
+                while (!cancelled) {
+                    synchronized (this) {
+                        if (!this.load) {
+                            this.playingProgress = System.currentTimeMillis() - this.startPlayingTime;
+                            AL10.alSourcePause(this.streamingSource);
+                            while (!this.load) {
+                                wait();
                             }
+                            this.startPlayingTime = System.currentTimeMillis() - this.playingProgress;
+                            AL10.alSourcePlay(this.streamingSource);
+                        }
+                    }
+
+                    int processed = AL10.alGetSourcei(this.streamingSource, AL10.AL_BUFFERS_PROCESSED);
+                    while (processed-- > 0) {
+                        int[] buf = new int[1];
+                        AL10.alSourceUnqueueBuffers(this.streamingSource, buf);
+                        AL10.alDeleteBuffers(buf);
+                        queuedCount--;
+                    }
+
+                    this.playingProgress = System.currentTimeMillis() - this.startPlayingTime;
+                    if (lyric != null) lyric.update(this.playingProgress);
+
+                    while (queuedCount < 4 && !eof) {
+                        int totalRead = readChunkWithRetry(rawIn, chunkBuf, chunkSize);
+                        if (totalRead < 0) {
+                            eof = true;
+                            break;
                         }
                         if (totalRead == 0) break;
 
@@ -344,59 +355,20 @@ public class MusicPlayer implements Runnable {
                         buf.flip();
 
                         int newBuf = AL10.alGenBuffers();
-                        AL10.alBufferData(newBuf, alFormat, buf, (int) audioFormat.getSampleRate());
-
-                        streamingBuffers.add(newBuf);
+                        AL10.alBufferData(newBuf, alFormat, buf, sampleRate);
                         AL10.alSourceQueueBuffers(this.streamingSource, newBuf);
                         queuedCount++;
                     }
 
-                    if (queuedCount == 0) break;
-
-                    if (AL10.alGetSourcei(this.streamingSource, AL10.AL_SOURCE_STATE) != AL10.AL_PLAYING) {
+                    if (queuedCount > 0 && AL10.alGetSourcei(this.streamingSource, AL10.AL_SOURCE_STATE) != AL10.AL_PLAYING) {
                         AL10.alSourcePlay(this.streamingSource);
                     }
 
-                    while (queuedCount > 0 || !eof) {
-                        synchronized (this) {
-                            if (!this.load) {
-                                AL10.alSourcePause(this.streamingSource);
-                                this.playingProgress = System.currentTimeMillis() - this.startPlayingTime;
-                                while (!this.load) {
-                                    wait();
-                                }
-                                this.startPlayingTime = System.currentTimeMillis() - this.playingProgress;
-                                AL10.alSourcePlay(this.streamingSource);
-                            }
-                        }
-
-                        if (cancelled) break;
-
-                        int processed = AL10.alGetSourcei(this.streamingSource, AL10.AL_BUFFERS_PROCESSED);
-                        while (processed-- > 0) {
-                            int[] unqueued = new int[1];
-                            AL10.alSourceUnqueueBuffers(this.streamingSource, unqueued);
-                            AL10.alDeleteBuffers(unqueued);
-                            streamingBuffers.remove((Integer) unqueued[0]);
-                            queuedCount--;
-                        }
-
-                        if (eof && queuedCount == 0) break;
-
-                        if (this.streamingSource != 0 && AL10.alGetSourcei(this.streamingSource, AL10.AL_SOURCE_STATE) == AL10.AL_STOPPED && queuedCount == 0) {
-                            break;
-                        }
-
-                        if (this.streamingSource != 0) {
-                            this.playingProgress = System.currentTimeMillis() - this.startPlayingTime;
-                            if (lyric != null) {
-                                lyric.update(this.playingProgress);
-                            }
-                        }
-
-                        Thread.sleep(20);
+                    if (eof && queuedCount == 0 && AL10.alGetSourcei(this.streamingSource, AL10.AL_SOURCE_STATE) == AL10.AL_STOPPED) {
                         break;
                     }
+
+                    Thread.sleep(20);
                 }
             } finally {
                 this.playingProgress = 0;
@@ -418,6 +390,23 @@ public class MusicPlayer implements Runnable {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private static int readChunkWithRetry(AudioInputStream in, byte[] buf, int size) throws Exception {
+        int totalRead = 0;
+        int retries = 0;
+        while (totalRead < size) {
+            try {
+                int n = in.read(buf, totalRead, size - totalRead);
+                if (n == -1) return -1;
+                totalRead += n;
+                retries = 0;
+            } catch (IOException e) {
+                if (++retries > 3) throw e;
+                Thread.sleep(500L * retries);
+            }
+        }
+        return totalRead;
     }
 
     /**
